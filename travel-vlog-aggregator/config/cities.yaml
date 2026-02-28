@@ -1,0 +1,92 @@
+# 収集対象都市の設定
+# priority: 高いほど先に収集（1が最高）
+
+cities:
+  # 国内
+  - id: kyoto
+    name_ja: 京都
+    name_en: Kyoto
+    country: JP
+    region: domestic
+    priority: 1
+
+  - id: osaka
+    name_ja: 大阪
+    name_en: Osaka
+    country: JP
+    region: domestic
+    priority: 1
+
+  - id: tokyo
+    name_ja: 東京
+    name_en: Tokyo
+    country: JP
+    region: domestic
+    priority: 1
+
+  - id: okinawa
+    name_ja: 沖縄
+    name_en: Okinawa
+    country: JP
+    region: domestic
+    priority: 2
+
+  - id: hokkaido
+    name_ja: 北海道
+    name_en: Hokkaido
+    country: JP
+    region: domestic
+    priority: 2
+
+  - id: fukuoka
+    name_ja: 福岡
+    name_en: Fukuoka
+    country: JP
+    region: domestic
+    priority: 2
+
+  # 海外
+  - id: bangkok
+    name_ja: バンコク
+    name_en: Bangkok
+    country: TH
+    region: overseas
+    priority: 1
+
+  - id: seoul
+    name_ja: ソウル
+    name_en: Seoul
+    country: KR
+    region: overseas
+    priority: 1
+
+  - id: taipei
+    name_ja: 台北
+    name_en: Taipei
+    country: TW
+    region: overseas
+    priority: 1
+
+  - id: paris
+    name_ja: パリ
+    name_en: Paris
+    country: FR
+    region: overseas
+    priority: 2
+
+# 検索クエリのテンプレート
+# {city_ja} と {city_en} が都市名で置換される
+query_templates:
+  - "{city_ja} vlog 観光"
+  - "{city_ja} 一人旅 vlog"
+  - "{city_ja} 女子旅 vlog"
+  - "{city_ja} 旅行 モデルコース vlog"
+  - "{city_en} travel vlog"
+  - "{city_ja} バックパッカー"
+  - "{city_ja} 旅行 グルメ vlog"
+
+# 1クエリあたりの最大取得件数（YouTube APIのmaxResults上限は50）
+max_results_per_query: 20
+
+# 最低視聴回数フィルタ（これ未満は収集しない）
+min_view_count: 1000

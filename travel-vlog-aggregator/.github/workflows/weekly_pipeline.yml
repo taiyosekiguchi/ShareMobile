@@ -1,0 +1,109 @@
+name: Weekly Travel Vlog Pipeline
+
+on:
+  # 毎週月曜日 9:00 JST（= 0:00 UTC）に実行
+  schedule:
+    - cron: "0 0 * * 1"
+
+  # 手動実行も可能
+  workflow_dispatch:
+    inputs:
+      city:
+        description: "対象都市ID（省略時は全都市）"
+        required: false
+        default: ""
+      skip_collect:
+        description: "収集をスキップ（分類・記事生成のみ）"
+        required: false
+        default: "false"
+      skip_generate:
+        description: "記事生成をスキップ"
+        required: false
+        default: "false"
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: travel-vlog-aggregator/requirements.txt
+
+      - name: Install dependencies
+        working-directory: travel-vlog-aggregator
+        run: pip install -r requirements.txt
+
+      # DBをキャッシュして前回の収集結果を引き継ぐ
+      - name: Restore DB cache
+        uses: actions/cache@v4
+        with:
+          path: travel-vlog-aggregator/travel_vlogs.db
+          key: travel-vlogs-db-${{ github.run_number }}
+          restore-keys: |
+            travel-vlogs-db-
+
+      # ── Step 1: 収集 ──────────────────────────────────────────────
+      - name: Collect videos
+        if: inputs.skip_collect != 'true'
+        working-directory: travel-vlog-aggregator
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -n "${{ inputs.city }}" ]; then
+            python main.py collect --city ${{ inputs.city }}
+          else
+            python main.py collect --all
+          fi
+
+      # ── Step 2: チャンネル分類 ────────────────────────────────────
+      - name: Classify channels
+        working-directory: travel-vlog-aggregator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python main.py classify --limit 300
+
+      # ── Step 3: 記事生成 ──────────────────────────────────────────
+      - name: Generate articles
+        if: inputs.skip_generate != 'true'
+        working-directory: travel-vlog-aggregator
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          GENRES=("女子旅" "一人旅" "バックパッカー" "カップル旅行" "グルメ特化")
+          CITIES=("kyoto" "osaka" "tokyo" "okinawa" "bangkok" "seoul" "taipei")
+
+          TARGET_CITY="${{ inputs.city }}"
+
+          for city in "${CITIES[@]}"; do
+            # 特定都市が指定されていればそれのみ
+            if [ -n "$TARGET_CITY" ] && [ "$city" != "$TARGET_CITY" ]; then
+              continue
+            fi
+            for genre in "${GENRES[@]}"; do
+              echo "--- $city × $genre ---"
+              python main.py generate --city "$city" --genre "$genre" || true
+            done
+          done
+
+      # ── Step 4: 生成記事をコミット ────────────────────────────────
+      - name: Commit generated articles
+        working-directory: travel-vlog-aggregator
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add output/
+          if git diff --cached --quiet; then
+            echo "新規記事なし"
+          else
+            git commit -m "chore: 週次記事生成 $(date +'%Y-%m-%d')"
+            git push
+          fi
